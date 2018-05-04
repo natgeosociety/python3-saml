@@ -8,7 +8,7 @@ from setuptools import setup
 
 
 setup(
-    name='python3-saml',
+    name='python3-saml-fork',
     version='1.4.1',
     description='Onelogin Python Toolkit. Add SAML support to your Python software using this library',
     classifiers=[
