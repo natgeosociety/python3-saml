@@ -112,7 +112,7 @@ class OneLogin_Saml2_Logout_Request(object):
             logout_request = OneLogin_Saml2_Utils.decode_base64_and_inflate(request, ignore_zip=True)
             self.id = self.get_id(logout_request)
 
-        self.__logout_request = compat.to_string(logout_request)
+        self.__logout_request = compat.to_bytes(logout_request)
 
     def get_request(self, deflate=True):
         """
