@@ -13,7 +13,6 @@ import base64
 from copy import deepcopy
 import calendar
 from datetime import datetime
-from defusedxml.lxml import fromstring
 from hashlib import sha1, sha256, sha384, sha512
 from isodate import parse_duration as duration_parser
 import re
@@ -391,7 +390,7 @@ class OneLogin_Saml2_Utils(object):
 
     @staticmethod
     def parse_time_to_SAML(time):
-        """
+        r"""
         Converts a UNIX timestamp to SAML2 timestamp on the form
         yyyy-mm-ddThh:mm:ss(\.s+)?Z.
 
@@ -406,7 +405,7 @@ class OneLogin_Saml2_Utils(object):
 
     @staticmethod
     def parse_SAML_to_time(timestr):
-        """
+        r"""
         Converts a SAML2 timestamp on the form yyyy-mm-ddThh:mm:ss(\.s+)?Z
         to a UNIX timestamp. The sub-second part is ignored.
 
@@ -684,7 +683,7 @@ class OneLogin_Saml2_Utils(object):
         """
 
         if isinstance(encrypted_data, Element):
-            encrypted_data = fromstring(str(encrypted_data.toxml()))
+            encrypted_data = OneLogin_Saml2_XML.to_etree(str(encrypted_data.toxml()))
         if not inplace and isinstance(encrypted_data, OneLogin_Saml2_XML._element_class):
             encrypted_data = deepcopy(encrypted_data)
         elif isinstance(encrypted_data, OneLogin_Saml2_XML._text_class):

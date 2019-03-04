@@ -161,6 +161,18 @@ class OneLogin_Saml2_Response(object):
                         OneLogin_Saml2_ValidationError.WRONG_NUMBER_OF_AUTHSTATEMENTS
                     )
 
+                # Checks that the response has all of the AuthnContexts that we provided in the request.
+                # Only check if failOnAuthnContextMismatch is true and requestedAuthnContext is set to a list.
+                requested_authn_contexts = security['requestedAuthnContext']
+                if security['failOnAuthnContextMismatch'] and requested_authn_contexts and requested_authn_contexts is not True:
+                    authn_contexts = self.get_authn_contexts()
+                    unmatched_contexts = set(requested_authn_contexts).difference(authn_contexts)
+                    if unmatched_contexts:
+                        raise OneLogin_Saml2_ValidationError(
+                            'The AuthnContext "%s" didn\'t include requested context "%s"' % (', '.join(authn_contexts), ', '.join(unmatched_contexts)),
+                            OneLogin_Saml2_ValidationError.AUTHN_CONTEXT_MISMATCH
+                        )
+
                 # Checks that there is at least one AttributeStatement if required
                 attribute_statement_nodes = self.__query_assertion('/saml:AttributeStatement')
                 if security.get('wantAttributeStatement', True) and not attribute_statement_nodes:
@@ -206,7 +218,11 @@ class OneLogin_Saml2_Response(object):
                 for issuer in issuers:
                     if issuer is None or issuer != idp_entity_id:
                         raise OneLogin_Saml2_ValidationError(
-                            'Invalid issuer in the Assertion/Response',
+                            'Invalid issuer in the Assertion/Response (expected %(idpEntityId)s, got %(issuer)s)' %
+                            {
+                                'idpEntityId': idp_entity_id,
+                                'issuer': issuer
+                            },
                             OneLogin_Saml2_ValidationError.WRONG_ISSUER
                         )
 
@@ -360,6 +376,16 @@ class OneLogin_Saml2_Response(object):
         """
         audience_nodes = self.__query_assertion('/saml:Conditions/saml:AudienceRestriction/saml:Audience')
         return [OneLogin_Saml2_XML.element_text(node) for node in audience_nodes if OneLogin_Saml2_XML.element_text(node) is not None]
+
+    def get_authn_contexts(self):
+        """
+        Gets the authentication contexts
+
+        :returns: The authentication classes for the SAML Response
+        :rtype: list
+        """
+        authn_context_nodes = self.__query_assertion('/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef')
+        return [OneLogin_Saml2_XML.element_text(node) for node in authn_context_nodes]
 
     def get_issuers(self):
         """
@@ -531,6 +557,15 @@ class OneLogin_Saml2_Response(object):
                     if attr_text:
                         values.append(attr_text)
 
+                # Parse any nested NameID children
+                for nameid in attr.iterchildren('{%s}NameID' % OneLogin_Saml2_Constants.NSMAP['saml']):
+                    values.append({
+                        'NameID': {
+                            'Format': nameid.get('Format'),
+                            'NameQualifier': nameid.get('NameQualifier'),
+                            'value': nameid.text
+                        }
+                    })
             attributes[attr_name] = values
         return attributes
 
@@ -617,7 +652,7 @@ class OneLogin_Saml2_Response(object):
             if not self.validate_signed_elements(signed_elements, raise_exceptions=True):
                 raise OneLogin_Saml2_ValidationError(
                     'Found an unexpected Signature Element. SAML Response rejected',
-                    OneLogin_Saml2_ValidationError.UNEXPECTED_SIGNED_ELEMENT
+                    OneLogin_Saml2_ValidationError.UNEXPECTED_SIGNED_ELEMENTS
                 )
         return signed_elements
 
@@ -702,6 +737,7 @@ class OneLogin_Saml2_Response(object):
         signature_expr = '/ds:Signature/ds:SignedInfo/ds:Reference'
         signed_assertion_query = '/samlp:Response' + assertion_expr + signature_expr
         assertion_reference_nodes = self.__query(signed_assertion_query)
+        tagid = None
 
         if not assertion_reference_nodes:
             # Check if the message is signed
@@ -709,21 +745,26 @@ class OneLogin_Saml2_Response(object):
             message_reference_nodes = self.__query(signed_message_query)
             if message_reference_nodes:
                 message_id = message_reference_nodes[0].get('URI')
-                final_query = "/samlp:Response[@ID='%s']/" % message_id[1:]
+                final_query = "/samlp:Response[@ID=$tagid]/"
+                tagid = message_id[1:]
             else:
                 final_query = "/samlp:Response"
             final_query += assertion_expr
         else:
             assertion_id = assertion_reference_nodes[0].get('URI')
-            final_query = '/samlp:Response' + assertion_expr + "[@ID='%s']" % assertion_id[1:]
+            final_query = '/samlp:Response' + assertion_expr + "[@ID=$tagid]"
+            tagid = assertion_id[1:]
         final_query += xpath_expr
-        return self.__query(final_query)
+        return self.__query(final_query, tagid)
 
-    def __query(self, query):
+    def __query(self, query, tagid=None):
         """
         Extracts nodes that match the query from the Response
 
         :param query: Xpath Expresion
+        :type query: String
+
+        :param tagid: Tag ID
         :type query: String
 
         :returns: The queried nodes
@@ -733,7 +774,7 @@ class OneLogin_Saml2_Response(object):
             document = self.decrypted_document
         else:
             document = self.document
-        return OneLogin_Saml2_XML.query(document, query)
+        return OneLogin_Saml2_XML.query(document, query, None, tagid)
 
     def __decrypt_assertion(self, xml):
         """
@@ -782,7 +823,7 @@ class OneLogin_Saml2_Response(object):
                         if not uri.startswith('#'):
                             break
                         uri = uri.split('#')[1]
-                        encrypted_key = OneLogin_Saml2_XML.query(encrypted_assertion_nodes[0], './xenc:EncryptedKey[@Id="' + uri + '"]')
+                        encrypted_key = OneLogin_Saml2_XML.query(encrypted_assertion_nodes[0], './xenc:EncryptedKey[@Id=$tagid]', None, uri)
                         if encrypted_key:
                             keyinfo.append(encrypted_key[0])
 
