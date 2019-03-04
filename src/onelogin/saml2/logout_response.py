@@ -38,7 +38,7 @@ class OneLogin_Saml2_Logout_Response(object):
         self.id = None
 
         if response is not None:
-            self.__logout_response = compat.to_string(OneLogin_Saml2_Utils.decode_base64_and_inflate(response))
+            self.__logout_response = compat.to_string(OneLogin_Saml2_Utils.decode_base64_and_inflate(response, ignore_zip=True))
             self.document = OneLogin_Saml2_XML.to_etree(compat.to_bytes(self.__logout_response))
             self.id = self.document.get('ID', None)
 
@@ -106,7 +106,11 @@ class OneLogin_Saml2_Logout_Response(object):
                 issuer = self.get_issuer()
                 if issuer is not None and issuer != idp_entity_id:
                     raise OneLogin_Saml2_ValidationError(
-                        'Invalid issuer in the Logout Request',
+                        'Invalid issuer in the Logout Response (expected %(idpEntityId)s, got %(issuer)s)' %
+                        {
+                            'idpEntityId': idp_entity_id,
+                            'issuer': issuer
+                        },
                         OneLogin_Saml2_ValidationError.WRONG_ISSUER
                     )
 

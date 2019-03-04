@@ -77,7 +77,7 @@ class OneLogin_Saml2_Logout_Response_Test(unittest.TestCase):
 
         logout_url = OneLogin_Saml2_Utils.redirect('http://idp.example.com/SingleLogoutService.php', parameters, True)
 
-        self.assertRegex(logout_url, '^http://idp\.example\.com\/SingleLogoutService\.php\?SAMLResponse=')
+        self.assertRegex(logout_url, r'^http://idp\.example\.com\/SingleLogoutService\.php\?SAMLResponse=')
         url_parts = urlparse(logout_url)
         exploded = parse_qs(url_parts.query)
         inflated = compat.to_string(OneLogin_Saml2_Utils.decode_base64_and_inflate(exploded['SAMLResponse'][0]))
@@ -208,7 +208,7 @@ class OneLogin_Saml2_Logout_Response_Test(unittest.TestCase):
 
         settings.set_strict(True)
         response_2 = OneLogin_Saml2_Logout_Response(settings, message)
-        with self.assertRaisesRegex(Exception, 'Invalid issuer in the Logout Request'):
+        with self.assertRaisesRegex(Exception, 'Invalid issuer in the Logout Response'):
             response_2.is_valid(request_data, raise_exceptions=True)
 
     def testIsInValidDestination(self):
