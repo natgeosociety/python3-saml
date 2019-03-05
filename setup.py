@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
     name='ngs-python3-saml',
-    version='1.5.0',
+    version='1.5.0-ngs',
     description='Onelogin Python Toolkit. Add SAML support to your Python software using this library',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
